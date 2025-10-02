@@ -83,13 +83,23 @@ def generate_visual_report():
 
     # Add descriptive text box
     conclusion_text = (
-        "Conclusion:\n"
-        "1. Naive (unadjusted) and Biased MLE (collider-adjusted) are far from the true effect.\n"
-        "2. Both Correct MLE and Correct IPW successfully recover the true causal effect.\n\n"
-        "Takeaway: The key to correct causal inference is not the statistical method (MLE vs. IPW),\n"
-        "but the correct specification of the causal model (i.e., adjusting for confounders and not colliders)."
+        "**Analysis of Causal Effect Estimation Strategies**\n\n"
+        "This plot compares four different methods for estimating the causal effect of a drug on an adverse reaction. \n"
+        "The true effect is marked by the red dashed line.\n\n"
+        "**Key Observations:**\n"
+        "1. **Naive Estimation (Biased):** This method ignores all other variables and is heavily biased by confounding factors (e.g., disease severity).\n"
+        "   It fails to approximate the true effect.\n\n"
+        "2. **Biased MLE (Collider-Adjusted):** This model adjusts for `hospitalized`, which is a *collider*. Adjusting for a collider opens a spurious \n"
+        "   path between the treatment and outcome, inducing bias and leading to an incorrect estimate. This is a common pitfall when variables \n"
+        "   are selected for adjustment based on statistical association alone.\n\n"
+        "3. **Correct MLE & Correct IPW (EE):** Both methods successfully estimate the true causal effect because they are correctly specified. \n"
+        "   They adjust for all measured confounders (`L`, `age`, `sex`, `comorbidities`) without adjusting for the collider.\n\n"
+        "**Conclusion:**\n"
+        "Effective causal inference depends critically on the underlying causal model, not just the statistical technique used. Both Maximum Likelihood \n"
+        "Estimation (MLE) and Inverse Probability Weighting (IPW) can yield accurate results, but only when confounders are properly included and colliders \n"
+        "are excluded from the adjustment set."
     )
-    fig.text(0.5, 0.01, conclusion_text, ha='center', va='bottom', fontsize=12,
+    fig.text(0.5, 0.01, conclusion_text, ha='center', va='bottom', fontsize=11,
              bbox=dict(boxstyle='round,pad=0.5', fc='aliceblue', ec='black', lw=1))
 
     plt.savefig('causal_estimation_report.png', dpi=300)
