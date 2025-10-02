@@ -30,23 +30,20 @@ def generate_visual_report():
 
     # 3. Perform Standard MLE (Logistic Regression) - Adjusting for everything
     # This is standard practice in prediction, but induces collider bias for causal inference
-    mle_vars = df[['A', 'L', 'age', 'sex', 'comorbidities', 'hospitalized']]
-    mle_vars = sm.add_constant(mle_vars)
-    logit_mle = sm.Logit(Y, mle_vars).fit(disp=0)
-    mle_est = logit_mle.params['A']
-    mle_ci = logit_mle.conf_int().loc['A'].values
-    results['Standard MLE (Biased)'] = (mle_est, mle_ci[0], mle_ci[1])
+    mle_vars_biased = df[['A', 'L', 'age', 'sex', 'comorbidities', 'hospitalized']]
+    mle_vars_biased = sm.add_constant(mle_vars_biased)
+    logit_mle_biased = sm.Logit(Y, mle_vars_biased).fit(disp=0)
+    mle_est_biased = logit_mle_biased.params['A']
+    mle_ci_biased = logit_mle_biased.conf_int().loc['A'].values
+    results['Biased MLE (Collider)'] = (mle_est_biased, mle_ci_biased[0], mle_ci_biased[1])
 
-    # 4. Perform IPW with Collider (Incorrect Adjustment)
-    confounders_and_collider = df[['L', 'age', 'sex', 'comorbidities', 'hospitalized']].values
-    ps_model_collider = fit_propensity_score(confounders_and_collider, A)
-    ps_collider = ps_model_collider.predict_proba(confounders_and_collider)[:, 1]
-    weights_collider = compute_ipw(A, ps_collider)
-    ipw_model_collider = SemiMechanisticLogisticMSM(Y, A, weights=weights_collider)
-    ipw_solver_collider = EstimatingEquationSolver(ipw_model_collider)
-    theta_ipw_collider, _ = ipw_solver_collider.solve([-1, 0.5], max_iter=10, tol=1e-4)
-    ci_low_collider, ci_high_collider = ipw_solver_collider.confint(theta_ipw_collider)
-    results['Collider-Adjusted IPW'] = (theta_ipw_collider[1], ci_low_collider[1], ci_high_collider[1])
+    # 4. Perform Correct MLE (Adjusts for Confounders Only)
+    mle_vars_correct = df[['A', 'L', 'age', 'sex', 'comorbidities']]
+    mle_vars_correct = sm.add_constant(mle_vars_correct)
+    logit_mle_correct = sm.Logit(Y, mle_vars_correct).fit(disp=0)
+    mle_est_correct = logit_mle_correct.params['A']
+    mle_ci_correct = logit_mle_correct.conf_int().loc['A'].values
+    results['Correct MLE'] = (mle_est_correct, mle_ci_correct[0], mle_ci_correct[1])
 
     # 5. Perform Correct IPW Estimation
     confounders_only = df[['L', 'age', 'sex', 'comorbidities']].values
@@ -57,7 +54,7 @@ def generate_visual_report():
     ipw_solver_correct = EstimatingEquationSolver(ipw_model_correct)
     theta_ipw_correct, _ = ipw_solver_correct.solve([-1, 0.5], max_iter=10, tol=1e-4)
     ci_low_correct, ci_high_correct = ipw_solver_correct.confint(theta_ipw_correct)
-    results['Correct IPW'] = (theta_ipw_correct[1], ci_low_correct[1], ci_high_correct[1])
+    results['Correct IPW (EE)'] = (theta_ipw_correct[1], ci_low_correct[1], ci_high_correct[1])
 
     # 6. Generate the plot
     labels = list(results.keys())
@@ -67,7 +64,7 @@ def generate_visual_report():
     errors = [np.array(estimates) - np.array(lower_bounds), np.array(upper_bounds) - np.array(estimates)]
 
     plt.style.use('seaborn-v0_8-whitegrid')
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     # Plot estimates with error bars
     ax.errorbar(labels, estimates, yerr=errors, fmt='o', color='black',
@@ -79,9 +76,22 @@ def generate_visual_report():
     ax.set_ylabel('Causal log(OR) Estimate', fontsize=12)
     ax.set_title('Comparison of Causal Estimation Strategies', fontsize=14, fontweight='bold')
     ax.legend(fontsize=12)
-    ax.tick_params(axis='x', labelsize=12, rotation=15)
+    ax.tick_params(axis='x', labelsize=12, rotation=25)
 
-    fig.tight_layout()
+    # Adjust layout to make more room at the bottom for the text box
+    fig.tight_layout(rect=[0, 0.25, 1, 1])
+
+    # Add descriptive text box
+    conclusion_text = (
+        "Conclusion:\n"
+        "1. Naive (unadjusted) and Biased MLE (collider-adjusted) are far from the true effect.\n"
+        "2. Both Correct MLE and Correct IPW successfully recover the true causal effect.\n\n"
+        "Takeaway: The key to correct causal inference is not the statistical method (MLE vs. IPW),\n"
+        "but the correct specification of the causal model (i.e., adjusting for confounders and not colliders)."
+    )
+    fig.text(0.5, 0.01, conclusion_text, ha='center', va='bottom', fontsize=12,
+             bbox=dict(boxstyle='round,pad=0.5', fc='aliceblue', ec='black', lw=1))
+
     plt.savefig('causal_estimation_report.png', dpi=300)
 
 if __name__ == "__main__":
